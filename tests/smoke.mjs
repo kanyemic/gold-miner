@@ -71,12 +71,12 @@ const documentStub = {
     if (sel === '.pw[data-item]') return ['bomb', 'strength', 'luck'].map((k) => { const e = makeEl('pw-' + k); e.dataset = { item: k }; return e; });
     return [];
   },
-  addEventListener() {},
+  addEventListener(type, fn) { (this._listeners ||= {})[type] = fn; },
   body: makeEl('body'),
 };
 
 const windowStub = {
-  addEventListener() {},
+  addEventListener(type, fn) { (this._listeners ||= {})[type] = fn; },
   AudioContext: undefined,   // 走「无音频」降级分支
   webkitAudioContext: undefined,
 };
@@ -212,9 +212,12 @@ check('道具消耗后库存清空', game.state.strength === 0 && game.state.luc
 // 幸运草加成的价值
 game.state.luckTimer = 999;
 const base = game.LOOT.gold_m.value;
-const lit = Math.round(base * 1.35);
-check('幸运草价值加成计算正确', lit === Math.round(base * 1.35) && lit > base,
-  `${base} → ${lit}`);
+const beforeLuck = game.state.money;
+game.state.carrying = fake('gold_m');
+game.state.mode = 'pull';
+game.state.distance = 63;
+game.step(1 / 60);
+check('幸运草真实入账加成', game.state.money - beforeLuck === Math.round(base * 1.35));
 
 // ---------- 6. 炸药：钩住后炸掉
 
@@ -242,6 +245,37 @@ check('暂停期间时间不流逝', Math.abs(game.state.time - tBefore) < 0.001
 game.startLevel(0);
 game.state.money = 1000;
 game.state.earnedThisLevel = 300;
+
+game.state.totalEarned = 1500;
+game.state.phase = 'gameover';
+game.retryLevel();
+check('重试退回钱包与累计收入', game.state.money === 700 && game.state.totalEarned === 1200 && game.state.earnedThisLevel === 0);
+check('关外购买被拒绝', game.buyGood('bomb') === false && game.state.money === 700);
+game.state.phase = 'shop';
+game.nextLevel();
+game.nextLevel();
+check('连续进入下一关只生效一次', game.state.level === 2);
+const key = (key, repeat = false) => windowStub._listeners.keydown({key, repeat, preventDefault() {}});
+key('p');
+key('p', true);
+check('重复按键不取消暂停', game.state.mode === 'paused');
+key('p');
+windowStub._listeners.blur();
+check('失焦自动暂停', game.state.mode === 'paused');
+game.togglePause();
+documentStub.hidden = true;
+documentStub._listeners.visibilitychange();
+check('隐藏页面自动暂停', game.state.mode === 'paused');
+game.startLevel(0);
+game.items.splice(0);
+const far = {...fake('gold_s'), x: 480, y: 360, r: 3};
+const near = {...fake('gold_s'), x: 480, y: 350, r: 3};
+game.items.push(far, near);
+game.state.angle = 0;
+game.state.distance = 110;
+game.state.mode = 'shoot';
+game.step(0.05);
+check('扫掠按接触时间而非数组顺序抓取', game.state.carrying === near);
 
 // ---------- 汇总
 

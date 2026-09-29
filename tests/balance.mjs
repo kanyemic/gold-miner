@@ -1,7 +1,7 @@
 /* 平衡性验证：三个技能档位的玩家模型各跑多次，检查难度曲线。
  *
  * 模型差异只在「什么时候出手」：
- * - skilled：瞄准误差 σ≈0.05 rad，反应 0.25s —— 会等摆角对上才放钩。
+ * - skilled：等待真实摆角对准；误差按下方均匀分布参数采样。
  * - casual ：误差 σ≈0.20 rad，且有 35% 概率凭感觉乱放（不看摆角）。
  * - rookie ：误差 σ≈0.35 rad，50% 概率乱放，目标选择也不挑（只按距离近）。
  *
@@ -21,24 +21,28 @@ function simulate(game, lv, rng, p) {
   const s = game.state;
   const dt = 1 / 60;
   let guard = 0;
+  let intent = null;
+  let reaction = 0;
 
   while (s.phase === 'playing' && guard++ < 60 * 80) {
     if (s.mode === 'idle') {
-      const remaining = s.time;
-      let best = null;
-      let bestScore = -Infinity;
+      if (reaction > 0) { reaction -= dt; game.step(dt); continue; }
+      if (!intent) {
+        const remaining = s.time;
+        let best = null;
+        let bestScore = -Infinity;
 
-      for (const item of game.items) {
-        if (item.taken) continue;
-        const def = game.LOOT[item.type];
-        const dist = Math.hypot(item.x - 480, item.y - 222);
-        const travel = dist / 560 + dist / def.pull + p.react;
-        if (travel > remaining) continue;
-        const score = p.greedy
-          ? def.value / travel                      // 熟练玩家算性价比
-          : (450 - dist) + def.value * 0.05;        // 新手只想抓近的
-        if (score > bestScore) { bestScore = score; best = item; }
-      }
+        for (const item of game.items) {
+          if (item.taken) continue;
+          const def = game.LOOT[item.type];
+          const dist = Math.hypot(item.x - 480, item.y - 222);
+          const travel = dist / 560 + dist / def.pull + p.react + 0.8;
+          if (travel > remaining && remaining > 5) continue;
+          const score = p.greedy
+            ? def.value / travel                      // 熟练玩家算性价比
+            : (450 - dist) + def.value * 0.05;        // 新手只想抓近的
+          if (score > bestScore) { bestScore = score; best = item; }
+        }
       if (!best) break;
 
       const want = Math.atan2(best.x - 480, best.y - 222);
@@ -46,12 +50,12 @@ function simulate(game, lv, rng, p) {
       const err = (rng() - 0.5) * p.jitter * 2 + (blind ? (rng() - 0.5) * 1.2 : 0);
       const tol = blind ? 3 : p.tol;
 
-      if (Math.abs(s.angle - (want + err)) > tol) { game.step(dt); continue; }
-
-      s.angle = want + err;
-      s.distance = 62;
-      s.mode = 'idle';
+      intent = { angle: want + err, tol };
+      reaction = p.react;
+      }
+      if (reaction > 0 || Math.abs(s.angle - intent.angle) > intent.tol) { game.step(dt); continue; }
       game.shoot();
+      intent = null;
     }
     game.step(dt);
   }
@@ -74,6 +78,7 @@ for (let lv = 0; lv < levels; lv++) {
     let sum = 0;
     for (let run = 0; run < RUNS; run++) {
       const g = loadGame();
+      g.setRandom(makeRng(0x12345678 + lv * 7919 + run * 104729));
       g.startLevel(lv);
       const r = simulate(g, lv, makeRng(0x9e3779b9 + lv * 7919 + run * 104729 + name.length * 31), p);
       if (r.passed) passes++;

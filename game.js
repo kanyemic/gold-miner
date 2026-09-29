@@ -74,19 +74,20 @@
    */
   const LEVELS = [
     { goal: 620,  time: 60, plans: [['gold_s', 8], ['rock_s', 8], ['gold_m', 3], ['bag', 1]] },
-    { goal: 920,  time: 60, plans: [['gold_s', 8], ['rock_s', 7], ['gold_m', 5], ['rock_l', 2], ['bag', 2]] },
+    { goal: 900,  time: 60, plans: [['gold_s', 8], ['rock_s', 7], ['gold_m', 5], ['rock_l', 2], ['bag', 2]] },
     { goal: 1250, time: 60, plans: [['gold_s', 7], ['rock_s', 7], ['gold_m', 5], ['rock_l', 3], ['diamond', 1], ['bag', 2]] },
-    { goal: 1950, time: 55, plans: [['gold_s', 6], ['gold_m', 5], ['gold_l', 3], ['rock_s', 6], ['rock_l', 3], ['ruby', 2], ['bag', 2]] },
+    { goal: 1900, time: 55, plans: [['gold_s', 6], ['gold_m', 5], ['gold_l', 3], ['rock_s', 6], ['rock_l', 3], ['ruby', 2], ['bag', 2]] },
     { goal: 2100, time: 55, plans: [['gold_s', 6], ['gold_m', 5], ['gold_l', 4], ['rock_l', 3], ['skull', 3], ['emerald', 2], ['bag', 3]] },
-    { goal: 2600, time: 55, plans: [['gold_m', 7], ['gold_l', 5], ['rock_l', 4], ['ruby', 2], ['skull', 3], ['bag', 2]] },
-    { goal: 2900, time: 52, plans: [['gold_s', 5], ['gold_m', 5], ['gold_l', 4], ['rock_s', 6], ['rock_l', 4], ['diamond', 2], ['bag', 3]] },
-    { goal: 3300, time: 50, plans: [['gold_m', 6], ['gold_l', 5], ['gold_xl', 2], ['rock_l', 5], ['ruby', 2], ['skull', 3], ['bag', 3]] },
-    { goal: 3800, time: 50, plans: [['gold_s', 5], ['gold_m', 5], ['gold_l', 5], ['gold_xl', 2], ['rock_s', 6], ['rock_l', 5], ['diamond', 2], ['bag', 3]] },
-    { goal: 4500, time: 50, plans: [['gold_m', 5], ['gold_l', 5], ['gold_xl', 2], ['rock_l', 5], ['bone', 3], ['emerald', 3], ['diamond', 2], ['bag', 3]] },
+    { goal: 2500, time: 55, plans: [['gold_m', 7], ['gold_l', 5], ['rock_l', 4], ['ruby', 2], ['skull', 3], ['bag', 2]] },
+    { goal: 2600, time: 52, plans: [['gold_s', 5], ['gold_m', 5], ['gold_l', 4], ['rock_s', 6], ['rock_l', 4], ['diamond', 2], ['bag', 3]] },
+    { goal: 3000, time: 50, plans: [['gold_m', 6], ['gold_l', 5], ['gold_xl', 2], ['rock_l', 5], ['ruby', 2], ['skull', 3], ['bag', 3]] },
+    { goal: 3200, time: 50, plans: [['gold_s', 5], ['gold_m', 5], ['gold_l', 5], ['gold_xl', 2], ['rock_s', 6], ['rock_l', 5], ['diamond', 2], ['bag', 3]] },
+    { goal: 3750, time: 55, plans: [['gold_m', 5], ['gold_l', 5], ['gold_xl', 2], ['rock_l', 5], ['bone', 3], ['emerald', 3], ['diamond', 2], ['bag', 3]] },
   ];
 
+  let rng = Math.random;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  const rand = (a, b) => a + Math.random() * (b - a);
+  const rand = (a, b) => a + rng() * (b - a);
 
   // ---------------------------------------------------------------- DOM
 
@@ -94,6 +95,7 @@
   const ctx = canvas.getContext('2d');
   const dom = {
     stage: document.getElementById('stage'),
+    stageInner: document.getElementById('stage-inner'),
     level: document.getElementById('hud-level'),
     goal: document.getElementById('hud-goal'),
     money: document.getElementById('hud-money'),
@@ -118,55 +120,74 @@
   const Sfx = (() => {
     let audioCtx = null;
     let muted = false;
+    let disabled = false;
 
     const ensure = () => {
-      if (!audioCtx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return null;
-        audioCtx = new AC();
+      if (disabled) return null;
+      try {
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) { disabled = true; return null; }
+          audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          const p = audioCtx.resume();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        }
+        return audioCtx;
+      } catch (err) {
+        audioCtx = null;
+        disabled = true;
+        return null;
       }
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      return audioCtx;
     };
 
     const tone = (freq, dur, type = 'sine', vol = 0.16, slideTo = null) => {
-      if (muted) return;
-      const ac = ensure();
-      if (!ac) return;
-      const t0 = ac.currentTime;
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, t0);
-      if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t0 + dur);
-      gain.gain.setValueAtTime(0.0001, t0);
-      gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(gain).connect(ac.destination);
-      osc.start(t0);
-      osc.stop(t0 + dur + 0.02);
+      if (muted || disabled) return;
+      try {
+        const ac = ensure();
+        if (!ac) return;
+        const t0 = ac.currentTime;
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t0);
+        if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t0 + dur);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        osc.connect(gain).connect(ac.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+      } catch (e) {
+        disabled = true;
+      }
     };
 
     const noise = (dur = 0.28, vol = 0.2) => {
-      if (muted) return;
-      const ac = ensure();
-      if (!ac) return;
-      const len = Math.floor(ac.sampleRate * dur);
-      const buf = ac.createBuffer(1, len, ac.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 1.6;
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      const filter = ac.createBiquadFilter();
-      filter.type = 'lowpass';
-      const t0 = ac.currentTime;
-      filter.frequency.setValueAtTime(1400, t0);
-      filter.frequency.exponentialRampToValueAtTime(220, t0 + dur);
-      const gain = ac.createGain();
-      gain.gain.setValueAtTime(vol, t0);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(filter).connect(gain).connect(ac.destination);
-      src.start();
+      if (muted || disabled) return;
+      try {
+        const ac = ensure();
+        if (!ac) return;
+        const len = Math.floor(ac.sampleRate * dur);
+        const buf = ac.createBuffer(1, len, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 1.6;
+        const src = ac.createBufferSource();
+        src.buffer = buf;
+        const filter = ac.createBiquadFilter();
+        filter.type = 'lowpass';
+        const t0 = ac.currentTime;
+        filter.frequency.setValueAtTime(1400, t0);
+        filter.frequency.exponentialRampToValueAtTime(220, t0 + dur);
+        const gain = ac.createGain();
+        gain.gain.setValueAtTime(vol, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        src.connect(filter).connect(gain).connect(ac.destination);
+        src.start();
+      } catch (e) {
+        disabled = true;
+      }
     };
 
     return {
@@ -273,7 +294,7 @@
       }
     }
     for (let i = slots.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
+      const j = (rng() * (i + 1)) | 0;
       [slots[i], slots[j]] = [slots[j], slots[i]];
     }
 
@@ -295,7 +316,7 @@
       // 第一轮：在随机空格里找位（分布自然）
       const shuffled = slots.filter((s) => !s.used);
       for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = (Math.random() * (i + 1)) | 0;
+        const j = (rng() * (i + 1)) | 0;
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
       for (const s of shuffled) {
@@ -330,7 +351,7 @@
 
   function weightedPick(table) {
     const total = table.reduce((s, t) => s + t.weight, 0);
-    let roll = Math.random() * total;
+    let roll = rng() * total;
     for (const entry of table) {
       roll -= entry.weight;
       if (roll <= 0) return entry;
@@ -346,6 +367,34 @@
     const lenSq = dx * dx + dy * dy || 1;
     const t = clamp(((px - x1) * dx + (py - y1) * dy) / lenSq, 0, 1);
     return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+  };
+
+  // 求从 (x1, y1) 到 (x2, y2) 的位移线段与圆心在 (cx, cy)、半径为 r 的圆首次接触参数 t（0 <= t <= 1）
+  const segmentCircleFirstHit = (x1, y1, x2, y2, cx, cy, r) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const fx = x1 - cx;
+    const fy = y1 - cy;
+    const r2 = r * r;
+    const distStart2 = fx * fx + fy * fy;
+    if (distStart2 <= r2) return 0; // 起点已在碰撞球内
+
+    const a = dx * dx + dy * dy;
+    if (a < 1e-6) return null;
+
+    const b = 2 * (fx * dx + fy * dy);
+    const c = distStart2 - r2;
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) return null;
+
+    const sqrtDisc = Math.sqrt(disc);
+    const t1 = (-b - sqrtDisc) / (2 * a);
+    if (t1 >= 0 && t1 <= 1) return t1;
+    if (t1 < 0) {
+      const t2 = (-b + sqrtDisc) / (2 * a);
+      if (t2 >= 0) return 0;
+    }
+    return null;
   };
 
   const hookPos = (dist = state.distance) => ({
@@ -454,6 +503,7 @@
     carried.taken = true;
     items = items.filter((i) => i !== carried);
     state.carrying = null;
+    state.distance = REST_DIST;
     state.mode = IDLE;
     syncHud();
   }
@@ -511,14 +561,24 @@
         return;
       }
 
-      // 用本帧的位移线段做扫掠判定，避免高速下探穿过小物品
+      // 用本帧的位移线段做扫掠判定，按沿线段最先接触的时间 t 选取首个命中目标，避免穿透与前后顺序错乱
       const prev = hookPos(from);
+      let earliestHit = null;
+      let minT = Infinity;
+
       for (const item of items) {
         if (item.taken) continue;
-        if (pointToSegment(item.x, item.y, prev.x, prev.y, hook.x, hook.y) <= item.r + HOOK_R * 0.72) {
-          grabItem(item);
-          break;
+        const hitR = item.r + HOOK_R * 0.72;
+        const t = segmentCircleFirstHit(prev.x, prev.y, hook.x, hook.y, item.x, item.y, hitR);
+        if (t !== null && t < minT) {
+          minT = t;
+          earliestHit = item;
         }
+      }
+
+      if (earliestHit) {
+        state.distance = from + (state.distance - from) * minT;
+        grabItem(earliestHit);
       }
       return;
     }
@@ -532,7 +592,7 @@
         state.carrying.x = hook.x;
         state.carrying.y = hook.y;
         // 重物被硬拉时冒灰
-        if (speed < 240 && Math.random() < 0.5) {
+        if (speed < 240 && rng() < 0.5) {
           particles.push({
             x: hook.x + rand(-8, 8), y: hook.y + rand(-8, 8),
             vx: rand(-30, 30), vy: rand(-60, -10),
@@ -1073,12 +1133,17 @@
       sub: '超额 ' + (state.earnedThisLevel - conf.goal) + ' 金币。进商店补给，下一关目标 ' + nextGoal + '。',
       body: summaryHtml(conf) + shopHtml(),
       actions: [
-        { label: '进入第 ' + (state.level + 1) + ' 关', primary: true, on: () => startLevel(state.level) },
+        { label: '进入第 ' + (state.level + 1) + ' 关', primary: true, on: () => nextLevel() },
         { label: '返回主菜单', on: () => restartGame(true) },
       ],
       hint: '商店只在关间开放，道具会留到后面的关卡',
     });
     bindShopButtons();
+  }
+
+  function nextLevel() {
+    if (state.phase !== 'shop') return;
+    startLevel(state.level);
   }
 
   function showFailPanel(conf) {
@@ -1098,6 +1163,7 @@
   }
 
   function buyGood(key) {
+    if (state.phase !== 'shop') return false;
     const good = SHOP_GOODS.find((g) => g.key === key);
     if (!good) return false;
     if (state.money < good.price) { Sfx.deny(); toast('金币不够', true); return false; }
@@ -1126,8 +1192,10 @@
   }
 
   function retryLevel() {
-    // 把本关已入账的钱退回，避免反复重试刷钱包
+    if (state.phase !== 'gameover') return;
+    // 把本关已入账的钱退回，避免反复重试刷钱包；同时扣减本轮累计收入
     state.money = Math.max(0, state.money - state.earnedThisLevel);
+    state.totalEarned = Math.max(0, state.totalEarned - state.earnedThisLevel);
     startLevel(state.level - 1);
   }
 
@@ -1206,6 +1274,12 @@
       btn.disabled = state.phase !== 'playing' || (count === 0 && !active);
       btn.classList.toggle('active', active);
     });
+
+    const btnPause = document.getElementById('btn-pause');
+    if (btnPause) {
+      btnPause.disabled = state.phase !== 'playing';
+      btnPause.classList.toggle('active', state.mode === PAUSED);
+    }
   }
 
   function showPanel({ title, sub, body, actions, hint }) {
@@ -1263,6 +1337,7 @@
     }
     state.resumeMode = state.mode;
     state.mode = PAUSED;
+    syncHud();
     showPanel({
       title: '已暂停',
       sub: '绳子和秒表都停住了。',
@@ -1275,10 +1350,11 @@
     });
   }
 
-  // ---------------------------------------------------------------- 输入
+  // ---------------------------------------------------------------- 输入与生命周期
 
   window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.repeat) { e.preventDefault(); return; } // 忽略长按连击，防止 P/Esc 快速抖动反复切换暂停
     const k = e.key.toLowerCase();
 
     if (k === ' ' || k === 'arrowdown') {
@@ -1293,8 +1369,13 @@
     if (k === 'm') { toggleSound(); return; }
     if (k === 'p' || k === 'escape') { e.preventDefault(); togglePause(); return; }
     if (k === 'enter') {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.closest('button, [role="button"], a, input')) {
+        return; // 交由获得焦点的按钮原生 click 处理，避免回车与按钮点击双重触发跳关
+      }
+      e.preventDefault();
       if (state.phase === 'menu') startLevel(0);
-      else if (state.phase === 'shop') startLevel(state.level);
+      else if (state.phase === 'shop') nextLevel();
       else if (state.phase === 'gameover') retryLevel();
     }
   });
@@ -1311,6 +1392,19 @@
 
   document.getElementById('btn-sound').addEventListener('click', toggleSound);
 
+  const btnPauseEl = document.getElementById('btn-pause');
+  if (btnPauseEl) btnPauseEl.addEventListener('click', togglePause);
+
+  function handleVisibilityOrBlur() {
+    if (state.phase === 'playing' && state.mode !== PAUSED) {
+      togglePause();
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) handleVisibilityOrBlur();
+  });
+  window.addEventListener('blur', handleVisibilityOrBlur);
+
   function toggleSound() {
     const muted = Sfx.toggle();
     dom.soundIco.textContent = muted ? '🔇' : '🔊';
@@ -1321,13 +1415,20 @@
 
   function fitStage() {
     const wrap = document.getElementById('stage-wrap');
-    const pad = 36;
-    const scale = Math.max(0.4, Math.min(1, Math.min(
-      (wrap.clientWidth - pad) / W,
-      (wrap.clientHeight - pad) / H
-    )));
-    // 舞台布局尺寸恒为 960×640；grid 居中后缩放溢出是对称的，因此无需修正边距
-    dom.stage.style.setProperty('--scale', scale.toFixed(4));
+    if (!wrap) return;
+    const isMobile = window.innerWidth <= 1080;
+    const pad = isMobile ? 20 : 36;
+    const availW = Math.max(100, wrap.clientWidth - pad);
+    const availH = Math.max(100, wrap.clientHeight - pad);
+    const scale = Math.max(0.15, Math.min(1, Math.min(availW / W, availH / H)));
+    const targetW = Math.round(W * scale);
+    const targetH = Math.round(H * scale);
+
+    dom.stage.style.width = targetW + 'px';
+    dom.stage.style.height = targetH + 'px';
+    if (dom.stageInner) {
+      dom.stageInner.style.setProperty('--scale', scale.toFixed(4));
+    }
   }
   window.addEventListener('resize', fitStage);
 
@@ -1359,9 +1460,10 @@
 
   boot();
 
-  // 供自动化冒烟测试使用
+  // 供自动化冒烟测试与调试使用
   window.__goldMiner = {
-    state, LOOT, LEVELS, SHOP_GOODS, startLevel, shoot, usePowerup, buyGood,
+    state, LOOT, LEVELS, SHOP_GOODS, startLevel, nextLevel, retryLevel, shoot, usePowerup, buyGood, togglePause,
+    setRandom: (fn) => { rng = fn || Math.random; },
     MODES: { IDLE, SHOOT, PULL, PAUSED, FINISHED },
     step: (dt) => update(dt),          // 手动推进一帧，便于确定性测试
     reachable: isReachable,

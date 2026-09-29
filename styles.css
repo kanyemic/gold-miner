@@ -74,11 +74,20 @@ body::before {
 
 #stage {
   position: relative;
+  /* 布局宽高由 JS 动态同步为 Math.round(960*scale) 与 Math.round(640*scale)，彻底消除 Grid 溢出 */
   width: 960px;
   height: 640px;
   flex: none;
+}
+
+#stage-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 960px;
+  height: 640px;
+  transform-origin: top left;
   transform: scale(var(--scale, 1));
-  transform-origin: center center;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #120c16;
@@ -502,9 +511,15 @@ body::before {
 
 /* 小屏：侧栏落到下方 */
 @media (max-width: 1080px) {
-  html, body { overflow: auto; }
+  html, body { overflow-x: hidden; overflow-y: auto; }
   #app { flex-direction: column; height: auto; min-height: 100%; }
-  #stage-wrap { padding: 12px; }
+  #stage-wrap {
+    flex: 0 0 auto;
+    height: 66vh;
+    height: 66dvh;
+    min-height: 280px;
+    padding: 10px;
+  }
   #sidebar { flex: none; border-left: none; border-top: 1px solid rgba(255, 236, 200, 0.09); }
 }
 
