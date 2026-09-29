@@ -6,6 +6,7 @@
 
 ## 游戏特点
 
+- **在线即玩**：已部署至 GitHub Pages，点击即开：[https://kanyemic.github.io/gold-miner/](https://kanyemic.github.io/gold-miner/)
 - **真实物理回拉**：纯数学几何计算绳索摆动与射线抓取。不同矿物重量不同，回拉速度明显分层（如钻石 305px/s vs 巨石 92px/s）。
 - **完整道具闭环**：
   - **🧨 炸药（快捷键 B）**：钩到沉重无用的巨石时果断引爆，立即收回空爪。
