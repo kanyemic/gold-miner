@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>黄金矿工 · Gold Miner</title>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div id="app">
+  <div id="stage-wrap">
+    <div id="stage">
+      <canvas id="game" width="960" height="640" aria-label="黄金矿工游戏画面"></canvas>
+
+      <!-- 顶部 HUD -->
+      <header id="hud">
+        <div class="hud-block">
+          <span class="hud-label">关卡</span>
+          <span class="hud-value" id="hud-level">1</span>
+          <span class="hud-goal" id="hud-goal">目标 500</span>
+        </div>
+        <div class="hud-block hud-center">
+          <span class="hud-label">金币</span>
+          <span class="hud-value gold" id="hud-money">0</span>
+        </div>
+        <div class="hud-block hud-right">
+          <span class="hud-label">时间</span>
+          <span class="hud-value" id="hud-time">60</span>
+          <span class="hud-label" id="hud-strength-label">力量</span>
+          <span class="hud-value small" id="hud-strength">1.0x</span>
+        </div>
+        <div id="time-bar"><i id="time-bar-fill"></i></div>
+      </header>
+
+      <!-- 道具栏 -->
+      <div id="powerups" aria-label="道具栏">
+        <button class="pw" data-item="bomb" title="炸药（快捷键 B）：绳索卡住时炸掉抓到的物品">
+          <span class="pw-ico">🧨</span><span class="pw-name">炸药</span>
+          <span class="pw-badge" id="pw-bomb">0</span>
+        </button>
+        <button class="pw" data-item="strength" title="力量药水（快捷键 S）：本关拉回速度提升">
+          <span class="pw-ico">💪</span><span class="pw-name">力量</span>
+          <span class="pw-badge" id="pw-strength">0</span>
+        </button>
+        <button class="pw" data-item="luck" title="幸运草（快捷键 L）：本关矿物价值提升">
+          <span class="pw-ico">🍀</span><span class="pw-name">幸运</span>
+          <span class="pw-badge" id="pw-luck">0</span>
+        </button>
+        <button class="pw ghost" id="btn-sound" title="音效开关（快捷键 M）">
+          <span class="pw-ico" id="sound-ico">🔊</span><span class="pw-name">音效</span>
+        </button>
+      </div>
+
+      <!-- 中央浮层：开始 / 暂停 / 结算 / 游戏结束 -->
+      <div id="overlay" class="overlay">
+        <div class="panel" id="panel">
+          <h1 class="panel-title" id="panel-title">黄金矿工</h1>
+          <p class="panel-sub" id="panel-sub">摆动的爪子，等一个精准的时机</p>
+          <div class="panel-body" id="panel-body"></div>
+          <div class="panel-actions" id="panel-actions"></div>
+          <p class="panel-hint" id="panel-hint"></p>
+        </div>
+      </div>
+
+      <!-- 浮动提示 -->
+      <div id="toast-layer"></div>
+    </div>
+  </div>
+
+  <aside id="sidebar">
+    <h2 class="side-title">黄金矿工</h2>
+    <p class="side-desc">经典拉钩玩法的重制：钩住金块、宝石与神秘口袋，在时限内凑够目标金额。越重的宝贝拖得越慢。</p>
+
+    <dl class="side-list">
+      <div class="side-row"><dt>操作</dt><dd>空格 / ↓ / 点击画面：放下钩子</dd></div>
+      <div class="side-row"><dt>炸药</dt><dd>B 键 — 炸掉钩到的东西，解开僵局</dd></div>
+      <div class="side-row"><dt>力量药水</dt><dd>S 键 — 本关收线更快</dd></div>
+      <div class="side-row"><dt>幸运草</dt><dd>L 键 — 本关宝贝更值钱</dd></div>
+      <div class="side-row"><dt>暂停</dt><dd>Esc / P</dd></div>
+      <div class="side-row"><dt>静音</dt><dd>M</dd></div>
+    </dl>
+
+    <h3 class="side-sub">矿藏价值</h3>
+    <ul class="loot-list" id="loot-list"></ul>
+
+    <div class="side-foot">
+      <span id="build-tag">Gold Miner · Canvas 单页版</span>
+    </div>
+  </aside>
+</div>
+<script src="./game.js"></script>
+</body>
+</html>
